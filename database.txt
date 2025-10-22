@@ -1,0 +1,12 @@
+ARRAY test_arr 6 55 50 2 45 10 102 
+ARRAY numbers 3 One Two Three 
+SINGLY_LIST test 6 Apple Banana Kivi Orange Cherry Klubnika 
+SINGLY_LIST test_fruits 2 Apple Cherry 
+SINGLY_LIST fruits 4 Apple Apple Cherry Cherry 
+DOUBLY_LIST colors 4 Red Green Yellow Blue 
+DOUBLY_LIST colors_test 3 black orange green 
+STACK stack1 3 First Second Third 
+QUEUE queue1 3 Client1 Client2 Client3 
+TREE tree1 6 50 Apple 30 Banana 70 Cherry 20 Date 40 Elderberry 75 Kivi 
+TREE test_tree 7 50 Root 30 Left 70 Right 20 LeftLeft 40 LeftRight 75 NewNode 72 RightR 
+TREE test 1 50 Root 
