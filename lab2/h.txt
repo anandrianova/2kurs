@@ -1,0 +1,237 @@
+#ifndef ARRAY_H
+#define ARRAY_H
+
+#include <string>
+using namespace std;
+
+//структура для массива
+struct Array
+{
+    string* data; //указывает на первый элемент массива
+    int capacity; //размер массива
+    int size; //кол-во элементов
+};
+
+//создание массива
+Array* create_array(int initial_capacity=10);
+
+//операции с массивом
+void array_push_back(Array* arr, const string& value);//добавление в конец
+bool array_insert(Array* arr, int index, const string& value);//по индксу добавление
+string array_get(const Array* arr, int index);//поиск по индексу
+bool array_remove(Array* arr, int index);//удалить по идндксу
+bool array_replace(Array* arr, int index, const string& value);;//замена по индексу
+int array_length(const Array* arr);//длина массива
+void array_print(const Array* arr);//вывод массива
+void array_free(Array* arr);//очистка памяти
+
+#endif
+
+
+#ifndef DB_H
+#define DB_H
+
+#include <string>
+#include <unordered_map>
+using namespace std;
+
+// Структура для хранения всех контейнеров
+struct Database {
+    unordered_map<string, void*> arrays;
+    unordered_map<string, void*> singly_lists;
+    unordered_map<string, void*> doubly_lists;
+    unordered_map<string, void*> stacks;
+    unordered_map<string, void*> queues;
+    unordered_map<string, void*> trees;  
+};
+
+// Создание и управление базой данных
+Database* create_database();
+void free_database(Database* db);
+bool save_database(const Database* db, const string& filename);
+bool load_database(Database* db, const string& filename);
+
+// Командный интерфейс
+string execute_command(Database* db, const string& command);
+
+#endif
+
+
+#ifndef DOUBLELIST_H
+#define DOUBLELIST_H
+
+#include <string>
+using namespace std;
+
+// Узел двусвязного списка
+struct DNode {
+    string data;
+    DNode* prev; //предыдущий
+    DNode* next; //следующий
+};
+
+// Двусвязный список
+struct DoubleList {
+    DNode* head; //голова
+    DNode* tail; //хвост
+    int size; //кол-во
+};
+
+// Создание списка
+DoubleList* create_doubly_linked_list();
+
+
+void dll_push_front(DoubleList* list, const string& value);// Добавление в голову
+void dll_push_back(DoubleList* list, const string& value);// Добавление в хвост
+bool dll_insert_before(DoubleList* list, const string& target, const string& value);// Добавление до элемента
+bool dll_insert_after(DoubleList* list, const string& target, const string& value);// Добавление после элемента
+bool dll_pop_front(DoubleList* list);// Удаление из головы
+bool dll_pop_back(DoubleList* list);// Удаление из хвоста
+bool dll_remove_before(DoubleList* list, const string& target);// Удаление до элемента
+bool dll_remove_after(DoubleList* list, const string& target);// Удаление после элемента
+bool dll_remove_value(DoubleList* list, const string& value);// Удаление по значению
+DNode* dll_find(DoubleList* list, const string& value);// Поиск элемента
+void dll_print_forward(const DoubleList* list);// Чтение списка (прямой порядок)
+void dll_print_backward(const DoubleList* list);// Чтение списка (обратный порядок)
+int dll_size(const DoubleList* list);// Получение размера
+void dll_free(DoubleList* list);// Освобождение памяти
+
+#endif
+
+
+
+#ifndef FBT_H
+#define FBT_H
+
+#include <string>
+using namespace std;
+
+// Узел бинарного дерева
+struct TreeNode {
+    int key;           // Ключ узла (целое число)
+    string value;      // Значение узла (строка)
+    TreeNode* left;    // Указатель на левого потомка
+    TreeNode* right;   // Указатель на правого потомка
+};
+
+// Структура полного бинарного дерева
+struct FullBinaryTree {
+    TreeNode* root;    // Корень дерева
+    int size;          // Количество узлов в дереве
+};
+
+// Создание дерева
+FullBinaryTree* create_full_binary_tree();
+
+bool tree_insert(FullBinaryTree* tree, int key, const string& value);// Добавление элемента (сохраняя свойство полного бинарного дерева)
+string tree_search(const FullBinaryTree* tree, int key);// Поиск элемента по ключу
+bool is_full_binary_tree(const FullBinaryTree* tree);// Проверка является ли дерево полным бинарным деревом
+int tree_height(const TreeNode* node);// Получение высоты дерева
+int tree_size(const FullBinaryTree* tree);// Подсчет количества узлов
+void tree_print(const FullBinaryTree* tree);// Чтение дерева (визуальное представление)
+void tree_free(FullBinaryTree* tree);// Освобождение памяти
+
+// Обходы дерева
+void tree_inorder(const FullBinaryTree* tree);
+void tree_preorder(const FullBinaryTree* tree);
+void tree_postorder(const FullBinaryTree* tree);
+void tree_level_order(const FullBinaryTree* tree);
+
+#endif
+
+
+#ifndef QUEUE_H
+#define QUEUE_H
+
+#include <string>
+using namespace std;
+
+// Структура очереди на основе массива
+struct Queue {
+    string* data;// Данные очереди
+    int capacity;// Вместимость
+    int front;// Индекс начала
+    int rear;// Индекс конца
+    int size;// Текущий размер
+};
+
+// Создание очереди
+Queue* create_queue(int initial_capacity = 10);
+
+bool queue_push(Queue* queue, const string& value);// Добавление элемента (push)
+string queue_pop(Queue* queue);// Удаление элемента (pop)
+string queue_peek(const Queue* queue);// Чтение первого элемента без удаления
+bool queue_is_empty(const Queue* queue);// Проверка на пустоту
+int queue_size(const Queue* queue);// Получение размера
+void queue_print(const Queue* queue);// Чтение всей очереди
+void queue_free(Queue* queue);// Освобождение памяти
+
+#endif
+
+
+#ifndef SINGLELIST_H
+#define SINGLELIST_H
+
+#include <string>
+using namespace std;
+
+// Узел односвязного списка
+struct SNode {
+    string data; //узел
+    SNode* next; //указатель на след узел
+};
+
+// Односвязный список
+struct SingleList {
+    SNode* head; //первый узел
+    SNode* tail; // последний
+    int size; //кол-во
+};
+
+// Создание списка
+SingleList* create_singly_linked_list();
+
+//операции с массивом
+void sll_push_front(SingleList* list, const string& value);// Добавление в голову
+void sll_push_back(SingleList* list, const string& value);// Добавление в хвост
+bool sll_insert_before(SingleList* list, const string& target, const string& value);// Добавление до элемента
+bool sll_insert_after(SingleList* list, const string& target, const string& value);// Добавление после элемента
+bool sll_pop_front(SingleList* list);// Удаление из головы
+bool sll_pop_back(SingleList* list);// Удаление из хвоста
+bool sll_remove_before(SingleList* list, const string& target);// Удаление до элемента
+bool sll_remove_after(SingleList* list, const string& target);// Удаление после элемента
+bool sll_remove_value(SingleList* list, const string& value);// Удаление по значению
+SNode* sll_find(SingleList* list, const string& value);// Поиск элемента
+void sll_print_forward(const SingleList* list);// Чтение списка (прямой порядок)
+void sll_print_backward(const SingleList* list);// Чтение списка (обратный порядок - рекурсивно)
+int sll_size(const SingleList* list);// Получение размера
+void sll_free(SingleList* list);// Освобождение памяти
+
+#endif
+
+
+#ifndef STACK_H
+#define STACK_H
+
+#include <string>
+using namespace std;
+
+// Структура стека на основе массива
+struct Stack {
+    string* data;// Данные стека
+    int capacity;// Вместимость
+    int top;// Индекс верхнего элемента
+};
+
+// Создание стека
+Stack* create_stack(int initial_capacity = 10);
+
+bool stack_push(Stack* stack, const string& value);// Добавление элемента (push)
+string stack_pop(Stack* stack);// Удаление элемента (pop)
+string stack_peek(const Stack* stack);// Чтение верхнего элемента без удаления
+bool stack_is_empty(const Stack* stack);// Проверка на пустоту
+int stack_size(const Stack* stack);// Получение размера
+void stack_print(const Stack* stack);// Чтение всего стека
+void stack_free(Stack* stack);// Освобождение памяти
+
+#endif
