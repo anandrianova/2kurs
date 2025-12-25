@@ -1,0 +1,1351 @@
+#include "DB.h"
+#include "Array.h"
+#include "SingleList.h"
+#include "DoubleList.h"
+#include "Stack.h"
+#include "Queue.h"
+#include "FullBinaryTree.h"
+#include "HashTable.h"
+#include <fstream>
+#include <sstream>
+#include <queue>
+#include <stdexcept>
+#include <memory>
+
+using namespace std;
+
+// ========== Вспомогательные методы ==========
+
+vector<string> Database::splitCommand(const string& command) const {
+    vector<string> tokens;
+    istringstream iss(command);
+    string token;
+    
+    while (iss >> token) {
+        tokens.push_back(token);
+    }
+    
+    return tokens;
+}
+
+bool Database::isArrayCommand(const string& cmd) const {
+    return cmd.size() >= 2 && cmd[0] == 'M' && cmd != "MPRINT";
+}
+
+bool Database::isSinglyListCommand(const string& cmd) const {
+    return cmd.size() >= 2 && cmd[0] == 'F' && cmd != "FPRINT";
+}
+
+bool Database::isDoublyListCommand(const string& cmd) const {
+    return cmd.size() >= 2 && cmd[0] == 'L' && cmd != "LPRINT";
+}
+
+bool Database::isStackCommand(const string& cmd) const {
+    return cmd.size() >= 2 && cmd[0] == 'S' && cmd != "SPRINT";
+}
+
+bool Database::isQueueCommand(const string& cmd) const {
+    return cmd.size() >= 2 && cmd[0] == 'Q' && cmd != "QPRINT";
+}
+
+bool Database::isTreeCommand(const string& cmd) const {
+    return cmd.size() >= 2 && cmd[0] == 'T' && cmd != "TPRINT";
+}
+
+bool Database::isDoubleHashTableCommand(const string& cmd) const {
+    return (cmd == "HCREATE" || cmd == "hcreate" || 
+            cmd == "HINSERT" || cmd == "hinsert" ||
+            cmd == "HSEARCH" || cmd == "hsearch" ||
+            cmd == "HDELETE" || cmd == "hdelete" ||
+            cmd == "HPRINT" || cmd == "hprint" ||
+            cmd == "HSIZE" || cmd == "hsize");
+}
+
+// ========== Сохранение и загрузка ==========
+
+bool Database::saveToFile(const string& filename) const {
+    ofstream file(filename);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Сохраняем массивы
+    for (const auto& pair : arrays) {
+        file << "ARRAY " << pair.first << " ";
+        const Array* arr = pair.second.get();
+        file << arr->length() << " ";
+        for (int i = 0; i < arr->length(); ++i) {
+            file << arr->get(i) << " ";
+        }
+        file << "\n";
+    }
+    
+    // Сохраняем односвязные списки
+    for (const auto& pair : singly_lists) {
+        file << "SINGLY_LIST " << pair.first << " ";
+        const SingleList* list = pair.second.get();
+        
+        // Для списков нужен специальный формат
+        // Сохраним через сериализацию в отдельный файл
+        string list_filename = pair.first + "_slist.txt";
+        list->serialize_text(list_filename);
+        
+        ifstream list_file(list_filename);
+        string content((istreambuf_iterator<char>(list_file)), 
+                       istreambuf_iterator<char>());
+        list_file.close();
+        
+        file << content << "\n";
+        remove(list_filename.c_str());
+    }
+    
+    // Сохраняем двусвязные списки
+    for (const auto& pair : doubly_lists) {
+        file << "DOUBLY_LIST " << pair.first << " ";
+        const DoubleList* list = pair.second.get();
+        
+        string list_filename = pair.first + "_dlist.txt";
+        list->serialize_text(list_filename);
+        
+        ifstream list_file(list_filename);
+        string content((istreambuf_iterator<char>(list_file)), 
+                       istreambuf_iterator<char>());
+        list_file.close();
+        
+        file << content << "\n";
+        remove(list_filename.c_str());
+    }
+    
+    // Сохраняем стеки
+    for (const auto& pair : stacks) {
+        file << "STACK " << pair.first << " ";
+        const Stack* stack = pair.second.get();
+        
+        // Создаем временный стек для сохранения
+        Stack temp_stack = *stack;
+        vector<string> elements;
+        while (!temp_stack.is_empty()) {
+            elements.push_back(temp_stack.pop());
+        }
+        
+        file << elements.size() << " ";
+        for (int i = elements.size() - 1; i >= 0; --i) {
+            file << elements[i] << " ";
+        }
+        file << "\n";
+    }
+    
+    // Сохраняем очереди
+    for (const auto& pair : queues) {
+        file << "QUEUE " << pair.first << " ";
+        const Queue* queue = pair.second.get();
+        
+        // Создаем временную очередь для сохранения
+        Queue temp_queue = *queue;
+        vector<string> elements;
+        while (!temp_queue.is_empty()) {
+            elements.push_back(temp_queue.pop());
+        }
+        
+        file << elements.size() << " ";
+        for (const auto& elem : elements) {
+            file << elem << " ";
+        }
+        file << "\n";
+    }
+    
+    // Сохраняем деревья
+    for (const auto& pair : trees) {
+        file << "TREE " << pair.first << " ";
+        const FullBinaryTree* tree = pair.second.get();
+        
+        string tree_filename = pair.first + "_tree.txt";
+        tree->serialize_text(tree_filename);
+        
+        ifstream tree_file(tree_filename);
+        string content((istreambuf_iterator<char>(tree_file)), 
+                       istreambuf_iterator<char>());
+        tree_file.close();
+        
+        file << content << "\n";
+        remove(tree_filename.c_str());
+    }
+    
+    // Сохраняем двойные хэш-таблицы
+    for (const auto& pair : double_hash_tables) {
+        file << "DOUBLE_HASH_TABLE " << pair.first << " ";
+        const DoubleHashTable* table = pair.second.get();
+        
+        string table_filename = pair.first + "_dhash.bin";
+        table->serialize_binary(table_filename);
+        
+        ifstream table_file(table_filename, ios::binary);
+        string content((istreambuf_iterator<char>(table_file)), 
+                       istreambuf_iterator<char>());
+        table_file.close();
+        
+        // Кодируем бинарные данные в base64 для текстового файла
+        file << table_filename << " " << content.size() << " ";
+        // Здесь можно добавить base64 кодирование, но для простоты сохраним в отдельный файл
+        file << "\n";
+        remove(table_filename.c_str());
+    }
+    
+    file.close();
+    return true;
+}
+
+bool Database::loadFromFile(const string& filename) {
+    ifstream file(filename);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Очищаем текущие данные
+    clear();
+    
+    string line;
+    while (getline(file, line)) {
+        if (line.empty()) continue;
+        
+        istringstream iss(line);
+        string type, name;
+        
+        if (!(iss >> type >> name)) {
+            continue;
+        }
+        
+        if (type == "ARRAY") {
+            int size;
+            iss >> size;
+            
+            auto array_ptr = make_unique<Array>();
+            for (int i = 0; i < size; ++i) {
+                string value;
+                iss >> value;
+                array_ptr->push_back(value);
+            }
+            arrays[name] = move(array_ptr);
+        }
+        else if (type == "SINGLY_LIST") {
+            int size;
+            iss >> size;
+            
+            auto list_ptr = make_unique<SingleList>();
+            for (int i = 0; i < size; ++i) {
+                string value;
+                iss >> value;
+                list_ptr->push_back(value);
+            }
+            singly_lists[name] = move(list_ptr);
+        }
+        else if (type == "DOUBLY_LIST") {
+            int size;
+            iss >> size;
+            
+            auto list_ptr = make_unique<DoubleList>();
+            for (int i = 0; i < size; ++i) {
+                string value;
+                iss >> value;
+                list_ptr->push_back(value);
+            }
+            doubly_lists[name] = move(list_ptr);
+        }
+        else if (type == "STACK") {
+            int size;
+            iss >> size;
+            
+            auto stack_ptr = make_unique<Stack>();
+            vector<string> elements;
+            for (int i = 0; i < size; ++i) {
+                string value;
+                iss >> value;
+                elements.push_back(value);
+            }
+            
+            // Восстанавливаем стек в правильном порядке
+            for (int i = elements.size() - 1; i >= 0; --i) {
+                stack_ptr->push(elements[i]);
+            }
+            stacks[name] = move(stack_ptr);
+        }
+        else if (type == "QUEUE") {
+            int size;
+            iss >> size;
+            
+            auto queue_ptr = make_unique<Queue>();
+            for (int i = 0; i < size; ++i) {
+                string value;
+                iss >> value;
+                queue_ptr->push(value);
+            }
+            queues[name] = move(queue_ptr);
+        }
+        else if (type == "TREE") {
+            int size;
+            iss >> size;
+            
+            auto tree_ptr = make_unique<FullBinaryTree>();
+            // Дерево загружаем через специальный метод
+            string tree_filename = name + "_tree_load.txt";
+            ofstream temp_file(tree_filename);
+            
+            temp_file << size << endl;
+            for (int i = 0; i < size; ++i) {
+                string line_rest;
+                getline(iss, line_rest);
+                if (line_rest.empty() && i == 0) {
+                    // Первая строка уже считана
+                    continue;
+                }
+                temp_file << line_rest << endl;
+            }
+            temp_file.close();
+            
+            tree_ptr->deserialize_text(tree_filename);
+            trees[name] = move(tree_ptr);
+            
+            remove(tree_filename.c_str());
+        }
+        else if (type == "DOUBLE_HASH_TABLE") {
+            string table_filename;
+            int data_size;
+            iss >> table_filename >> data_size;
+            
+            auto table_ptr = make_unique<DoubleHashTable>();
+            table_ptr->deserialize_binary(table_filename);
+            double_hash_tables[name] = move(table_ptr);
+        }
+    }
+    
+    file.close();
+    return true;
+}
+
+void Database::clear() {
+    arrays.clear();
+    singly_lists.clear();
+    doubly_lists.clear();
+    stacks.clear();
+    queues.clear();
+    trees.clear();
+    double_hash_tables.clear();
+
+// ========== Геттеры ==========
+
+const Array* Database::getArray(const string& name) const {
+    auto it = arrays.find(name);
+    return it != arrays.end() ? it->second.get() : nullptr;
+}
+
+const SingleList* Database::getSinglyList(const string& name) const {
+    auto it = singly_lists.find(name);
+    return it != singly_lists.end() ? it->second.get() : nullptr;
+}
+
+const DoubleList* Database::getDoublyList(const string& name) const {
+    auto it = doubly_lists.find(name);
+    return it != doubly_lists.end() ? it->second.get() : nullptr;
+}
+
+const Stack* Database::getStack(const string& name) const {
+    auto it = stacks.find(name);
+    return it != stacks.end() ? it->second.get() : nullptr;
+}
+
+const Queue* Database::getQueue(const string& name) const {
+    auto it = queues.find(name);
+    return it != queues.end() ? it->second.get() : nullptr;
+}
+
+const FullBinaryTree* Database::getTree(const string& name) const {
+    auto it = trees.find(name);
+    return it != trees.end() ? it->second.get() : nullptr;
+}
+
+const DoubleHashTable* Database::getDoubleHashTable(const string& name) const {
+    auto it = double_hash_tables.find(name);
+    return it != double_hash_tables.end() ? it->second.get() : nullptr;
+}
+
+// ========== Обработка команд ==========
+
+string Database::executeCommand(const string& command) {
+    vector<string> tokens = splitCommand(command);
+    
+    if (tokens.empty()) {
+        return "ERROR: Empty command";
+    }
+    
+    string cmd = tokens[0];
+    
+    // Команда PRINT для любого контейнера
+    if (cmd == "PRINT" || cmd == "print") {
+        if (tokens.size() < 2) {
+            return "ERROR: PRINT requires container name";
+        }
+        
+        string container_name = tokens[1];
+        
+        if (arrays.find(container_name) != arrays.end()) {
+            arrays[container_name]->print();
+            return "SUCCESS";
+        }
+        else if (singly_lists.find(container_name) != singly_lists.end()) {
+            singly_lists[container_name]->print_forward();
+            return "SUCCESS";
+        }
+        else if (doubly_lists.find(container_name) != doubly_lists.end()) {
+            doubly_lists[container_name]->print_forward();
+            return "SUCCESS";
+        }
+        else if (stacks.find(container_name) != stacks.end()) {
+            stacks[container_name]->print();
+            return "SUCCESS";
+        }
+        else if (queues.find(container_name) != queues.end()) {
+            queues[container_name]->print();
+            return "SUCCESS";
+        }
+        else if (trees.find(container_name) != trees.end()) {
+            trees[container_name]->print();
+            return "SUCCESS";
+        }
+        else if (double_hash_tables.find(container_name) != double_hash_tables.end()) {
+            double_hash_tables[container_name]->print();
+            return "SUCCESS";
+        }
+        else if (cuckoo_hash_tables.find(container_name) != cuckoo_hash_tables.end()) {
+            cuckoo_hash_tables[container_name]->print();
+            return "SUCCESS";
+        }
+        else {
+            return "ERROR: Container not found: " + container_name;
+        }
+    }
+    
+    // Обработка команд для массивов (M)
+    else if (isArrayCommand(cmd)) {
+        if (tokens.size() < 2) {
+            return "ERROR: Array command requires container name";
+        }
+        
+        string array_name = tokens[1];
+        
+        if (cmd == "MCREATE" || cmd == "mcreate") {
+            if (arrays.find(array_name) != arrays.end()) {
+                return "ERROR: Array already exists: " + array_name;
+            }
+            arrays[array_name] = make_unique<Array>();
+            return "SUCCESS: Array created: " + array_name;
+        }
+        else if (cmd == "MPUSH" || cmd == "mpush") {
+            if (tokens.size() < 3) {
+                return "ERROR: MPUSH requires value";
+            }
+            if (arrays.find(array_name) == arrays.end()) {
+                return "ERROR: Array not found: " + array_name;
+            }
+            arrays[array_name]->push_back(tokens[2]);
+            return "SUCCESS: Value pushed to array";
+        }
+        else if (cmd == "MINSERT" || cmd == "minsert") {
+            if (tokens.size() < 4) {
+                return "ERROR: MINSERT requires index and value";
+            }
+            if (arrays.find(array_name) == arrays.end()) {
+                return "ERROR: Array not found: " + array_name;
+            }
+            try {
+                int index = stoi(tokens[2]);
+                if (arrays[array_name]->insert(index, tokens[3])) {
+                    return "SUCCESS: Value inserted at index " + tokens[2];
+                } else {
+                    return "ERROR: Invalid index";
+                }
+            } catch (const exception& e) {
+                return "ERROR: Invalid index format";
+            }
+        }
+        else if (cmd == "MGET" || cmd == "mget") {
+            if (tokens.size() < 3) {
+                return "ERROR: MGET requires index";
+            }
+            if (arrays.find(array_name) == arrays.end()) {
+                return "ERROR: Array not found: " + array_name;
+            }
+            try {
+                int index = stoi(tokens[2]);
+                string value = arrays[array_name]->get(index);
+                if (!value.empty()) {
+                    return "VALUE: " + value;
+                } else {
+                    return "ERROR: Invalid index or empty value";
+                }
+            } catch (const exception& e) {
+                return "ERROR: Invalid index format";
+            }
+        }
+        else if (cmd == "MDEL" || cmd == "mdel") {
+            if (tokens.size() < 3) {
+                return "ERROR: MDEL requires index";
+            }
+            if (arrays.find(array_name) == arrays.end()) {
+                return "ERROR: Array not found: " + array_name;
+            }
+            try {
+                int index = stoi(tokens[2]);
+                if (arrays[array_name]->remove(index)) {
+                    return "SUCCESS: Element removed at index " + tokens[2];
+                } else {
+                    return "ERROR: Invalid index";
+                }
+            } catch (const exception& e) {
+                return "ERROR: Invalid index format";
+            }
+        }
+        else if (cmd == "MREPLACE" || cmd == "mreplace") {
+            if (tokens.size() < 4) {
+                return "ERROR: MREPLACE requires index and value";
+            }
+            if (arrays.find(array_name) == arrays.end()) {
+                return "ERROR: Array not found: " + array_name;
+            }
+            try {
+                int index = stoi(tokens[2]);
+                if (arrays[array_name]->replace(index, tokens[3])) {
+                    return "SUCCESS: Value replaced at index " + tokens[2];
+                } else {
+                    return "ERROR: Invalid index";
+                }
+            } catch (const exception& e) {
+                return "ERROR: Invalid index format";
+            }
+        }
+        else if (cmd == "MSIZE" || cmd == "msize") {
+            if (arrays.find(array_name) == arrays.end()) {
+                return "ERROR: Array not found: " + array_name;
+            }
+            return "SIZE: " + to_string(arrays[array_name]->length());
+        }
+    }
+    
+    // Обработка команд для односвязных списков (F)
+    else if (isSinglyListCommand(cmd)) {
+        if (tokens.size() < 2) {
+            return "ERROR: Singly list command requires container name";
+        }
+        
+        string list_name = tokens[1];
+        
+        if (cmd == "FCREATE" || cmd == "fcreate") {
+            if (singly_lists.find(list_name) != singly_lists.end()) {
+                return "ERROR: Singly list already exists: " + list_name;
+            }
+            singly_lists[list_name] = make_unique<SingleList>();
+            return "SUCCESS: Singly list created: " + list_name;
+        }
+        else if (cmd == "FPUSH" || cmd == "fpush") {
+            if (tokens.size() < 4) {
+                return "ERROR: FPUSH requires type and value";
+            }
+            if (singly_lists.find(list_name) == singly_lists.end()) {
+                return "ERROR: Singly list not found: " + list_name;
+            }
+            
+            string push_type = tokens[2];
+            SingleList* list = singly_lists[list_name].get();
+            
+            if (push_type == "FRONT" || push_type == "front") {
+                string value = tokens[3];
+                list->push_front(value);
+                return "SUCCESS: Value pushed to front";
+            }
+            else if (push_type == "BACK" || push_type == "back") {
+                string value = tokens[3];
+                list->push_back(value);
+                return "SUCCESS: Value pushed to back";
+            }
+            else if (push_type == "BEFORE" || push_type == "before") {
+                if (tokens.size() < 5) {
+                    return "ERROR: FPUSH BEFORE requires target value";
+                }
+                if (list->insert_before(tokens[3], tokens[4])) {
+                    return "SUCCESS: Value inserted before target";
+                } else {
+                    return "ERROR: Target not found";
+                }
+            }
+            else if (push_type == "AFTER" || push_type == "after") {
+                if (tokens.size() < 5) {
+                    return "ERROR: FPUSH AFTER requires target value";
+                }
+                if (list->insert_after(tokens[3], tokens[4])) {
+                    return "SUCCESS: Value inserted after target";
+                } else {
+                    return "ERROR: Target not found";
+                }
+            }
+            else {
+                return "ERROR: Invalid push type. Use FRONT/BACK/BEFORE/AFTER";
+            }
+        }
+        else if (cmd == "FDEL" || cmd == "fdel") {
+            if (tokens.size() < 3) {
+                return "ERROR: FDEL requires type";
+            }
+            if (singly_lists.find(list_name) == singly_lists.end()) {
+                return "ERROR: Singly list not found: " + list_name;
+            }
+            
+            string del_type = tokens[2];
+            SingleList* list = singly_lists[list_name].get();
+            
+            if (del_type == "FRONT" || del_type == "front") {
+                if (list->pop_front()) {
+                    return "SUCCESS: Front element removed";
+                } else {
+                    return "ERROR: List is empty";
+                }
+            }
+            else if (del_type == "BACK" || del_type == "back") {
+                if (list->pop_back()) {
+                    return "SUCCESS: Back element removed";
+                } else {
+                    return "ERROR: List is empty";
+                }
+            }
+            else if (del_type == "VALUE" || del_type == "value") {
+                if (tokens.size() < 4) {
+                    return "ERROR: FDEL VALUE requires target value";
+                }
+                if (list->remove_value(tokens[3])) {
+                    return "SUCCESS: Value removed";
+                } else {
+                    return "ERROR: Value not found";
+                }
+            }
+            else if (del_type == "BEFORE" || del_type == "before") {
+                if (tokens.size() < 4) {
+                    return "ERROR: FDEL BEFORE requires target value";
+                }
+                if (list->remove_before(tokens[3])) {
+                    return "SUCCESS: Element before target removed";
+                } else {
+                    return "ERROR: Cannot remove before target";
+                }
+            }
+            else if (del_type == "AFTER" || del_type == "after") {
+                if (tokens.size() < 4) {
+                    return "ERROR: FDEL AFTER requires target value";
+                }
+                if (list->remove_after(tokens[3])) {
+                    return "SUCCESS: Element after target removed";
+                } else {
+                    return "ERROR: Cannot remove after target";
+                }
+            }
+            else {
+                return "ERROR: Invalid delete type. Use FRONT/BACK/VALUE/BEFORE/AFTER";
+            }
+        }
+        else if (cmd == "FGET" || cmd == "fget") {
+            if (singly_lists.find(list_name) == singly_lists.end()) {
+                return "ERROR: Singly list not found: " + list_name;
+            }
+            SingleList* list = singly_lists[list_name].get();
+            
+            if (tokens.size() == 2) {
+                string result = "LIST: ";
+                SNode* current = list->find_first();
+                while (current != nullptr) {
+                    result += current->data;
+                    current = list->find_next(current);
+                    if (current != nullptr) result += " -> ";
+                }
+                return result;
+            }
+            else if (tokens.size() == 3) {
+                SNode* found = list->find(tokens[2]);
+                if (found) {
+                    return "FOUND: " + found->data;
+                } else {
+                    return "NOT_FOUND";
+                }
+            }
+            else {
+                return "ERROR: FGET requires either no arguments (to display list) or one argument (to search)";
+            }
+        }
+        else if (cmd == "FSIZE" || cmd == "fsize") {
+            if (singly_lists.find(list_name) == singly_lists.end()) {
+                return "ERROR: Singly list not found: " + list_name;
+            }
+            return "SIZE: " + to_string(singly_lists[list_name]->get_size());
+        }
+        else if (cmd == "FPRINT_BACKWARD" || cmd == "fprint_backward") {
+            if (singly_lists.find(list_name) == singly_lists.end()) {
+                return "ERROR: Singly list not found: " + list_name;
+            }
+            singly_lists[list_name]->print_backward();
+            return "SUCCESS";
+        }
+    }
+    
+    // Обработка команд для двусвязных списков (L)
+    else if (isDoublyListCommand(cmd)) {
+        if (tokens.size() < 2) {
+            return "ERROR: Doubly list command requires container name";
+        }
+        
+        string list_name = tokens[1];
+        
+        if (cmd == "LCREATE" || cmd == "lcreate") {
+            if (doubly_lists.find(list_name) != doubly_lists.end()) {
+                return "ERROR: Doubly list already exists: " + list_name;
+            }
+            doubly_lists[list_name] = make_unique<DoubleList>();
+            return "SUCCESS: Doubly list created: " + list_name;
+        }
+        else if (cmd == "LPUSH" || cmd == "lpush") {
+            if (tokens.size() < 4) {
+                return "ERROR: LPUSH requires type and value";
+            }
+            if (doubly_lists.find(list_name) == doubly_lists.end()) {
+                return "ERROR: Doubly list not found: " + list_name;
+            }
+            
+            string push_type = tokens[2];
+            string value = tokens[3];
+            DoubleList* list = doubly_lists[list_name].get();
+            
+            if (push_type == "FRONT" || push_type == "front") {
+                list->push_front(value);
+                return "SUCCESS: Value pushed to front";
+            }
+            else if (push_type == "BACK" || push_type == "back") {
+                list->push_back(value);
+                return "SUCCESS: Value pushed to back";
+            }
+            else if (push_type == "BEFORE" || push_type == "before") {
+                if (tokens.size() < 5) {
+                    return "ERROR: LPUSH BEFORE requires target value";
+                }
+                if (list->insert_before(tokens[3], tokens[4])) {
+                    return "SUCCESS: Value inserted before target";
+                } else {
+                    return "ERROR: Target not found";
+                }
+            }
+            else if (push_type == "AFTER" || push_type == "after") {
+                if (tokens.size() < 5) {
+                    return "ERROR: LPUSH AFTER requires target value";
+                }
+                if (list->insert_after(tokens[3], tokens[4])) {
+                    return "SUCCESS: Value inserted after target";
+                } else {
+                    return "ERROR: Target not found";
+                }
+            }
+            else {
+                return "ERROR: Invalid push type. Use FRONT/BACK/BEFORE/AFTER";
+            }
+        }
+        else if (cmd == "LDEL" || cmd == "ldel") {
+            if (tokens.size() < 3) {
+                return "ERROR: LDEL requires type";
+            }
+            if (doubly_lists.find(list_name) == doubly_lists.end()) {
+                return "ERROR: Doubly list not found: " + list_name;
+            }
+            
+            string del_type = tokens[2];
+            DoubleList* list = doubly_lists[list_name].get();
+            
+            if (del_type == "FRONT" || del_type == "front") {
+                if (list->pop_front()) {
+                    return "SUCCESS: Front element removed";
+                } else {
+                    return "ERROR: List is empty";
+                }
+            }
+            else if (del_type == "BACK" || del_type == "back") {
+                if (list->pop_back()) {
+                    return "SUCCESS: Back element removed";
+                } else {
+                    return "ERROR: List is empty";
+                }
+            }
+            else if (del_type == "VALUE" || del_type == "value") {
+                if (tokens.size() < 4) {
+                    return "ERROR: LDEL VALUE requires target value";
+                }
+                if (list->remove_value(tokens[3])) {
+                    return "SUCCESS: Value removed";
+                } else {
+                    return "ERROR: Value not found";
+                }
+            }
+            else if (del_type == "BEFORE" || del_type == "before"){
+                if (tokens.size() < 4){
+                    return "ERROR: LDEL BEFORE requires target value";
+                }
+                if(list->remove_before(tokens[3])){
+                    return "SUCCESS: Element before target removed";
+                } else {
+                    return "ERROR: Cannot remove before target";
+                }
+            }
+            else if (del_type == "AFTER" || del_type == "after"){
+                if (tokens.size() < 4){
+                    return "ERROR: LDEL AFTER requires target value";
+                }
+                if(list->remove_after(tokens[3])){
+                    return "SUCCESS: Element after target removed";
+                } else {
+                    return "ERROR: Cannot remove after target";
+                }
+            }
+            else {
+                return "ERROR: Invalid delete type. Use FRONT/BACK/VALUE/BEFORE/AFTER";
+            }
+        }
+        else if (cmd == "LGET" || cmd == "lget") {
+            if (doubly_lists.find(list_name) == doubly_lists.end()) {
+                return "ERROR: Doubly list not found: " + list_name;
+            }
+            DoubleList* list = doubly_lists[list_name].get();
+            
+            if (tokens.size() == 2) {
+                string result = "LIST: ";
+                DNode* current = list->find_first();
+                while (current != nullptr) {
+                    result += current->data;
+                    current = list->find_next(current);
+                    if (current != nullptr) result += " <-> ";
+                }
+                return result;
+            }
+            else if (tokens.size() == 3) {
+                DNode* found = list->find(tokens[2]);
+                if (found) {
+                    return "FOUND: " + found->data;
+                } else {
+                    return "NOT_FOUND";
+                }
+            }
+        }
+        else if (cmd == "LPRINT_BACKWARD" || cmd == "lprint_backward") {
+            if (doubly_lists.find(list_name) == doubly_lists.end()) {
+                return "ERROR: Doubly list not found: " + list_name;
+            }
+            doubly_lists[list_name]->print_backward();
+            return "SUCCESS";
+        }
+        else if (cmd == "LSIZE" || cmd == "lsize") {
+            if (doubly_lists.find(list_name) == doubly_lists.end()) {
+                return "ERROR: Doubly list not found: " + list_name;
+            }
+            return "SIZE: " + to_string(doubly_lists[list_name]->get_size());
+        }
+    }
+    
+    // Обработка команд для стеков (S)
+    else if (isStackCommand(cmd)) {
+        if (tokens.size() < 2) {
+            return "ERROR: Stack command requires container name";
+        }
+        
+        string stack_name = tokens[1];
+        
+        if (cmd == "SCREATE" || cmd == "screate") {
+            if (stacks.find(stack_name) != stacks.end()) {
+                return "ERROR: Stack already exists: " + stack_name;
+            }
+            stacks[stack_name] = make_unique<Stack>();
+            return "SUCCESS: Stack created: " + stack_name;
+        }
+        else if (cmd == "SPUSH" || cmd == "spush") {
+            if (tokens.size() < 3) {
+                return "ERROR: SPUSH requires value";
+            }
+            if (stacks.find(stack_name) == stacks.end()) {
+                return "ERROR: Stack not found: " + stack_name;
+            }
+            stacks[stack_name]->push(tokens[2]);
+            return "SUCCESS: Value pushed to stack";
+        }
+        else if (cmd == "SPOP" || cmd == "spop") {
+            if (stacks.find(stack_name) == stacks.end()) {
+                return "ERROR: Stack not found: " + stack_name;
+            }
+            try {
+                string value = stacks[stack_name]->pop();
+                if (!value.empty()) {
+                    return "POPPED: " + value;
+                } else {
+                    return "ERROR: Stack is empty";
+                }
+            } catch (const runtime_error& e) {
+                return "ERROR: Stack is empty";
+            }
+        }
+        else if (cmd == "SPEEK" || cmd == "speek") {
+            if (stacks.find(stack_name) == stacks.end()) {
+                return "ERROR: Stack not found: " + stack_name;
+            }
+            try {
+                string value = stacks[stack_name]->peek();
+                if (!value.empty()) {
+                    return "PEEK: " + value;
+                } else {
+                    return "ERROR: Stack is empty";
+                }
+            } catch (const runtime_error& e) {
+                return "ERROR: Stack is empty";
+            }
+        }
+        else if (cmd == "SSIZE" || cmd == "ssize") {
+            if (stacks.find(stack_name) == stacks.end()) {
+                return "ERROR: Stack not found: " + stack_name;
+            }
+            return "SIZE: " + to_string(stacks[stack_name]->get_size());
+        }
+    }
+    
+    // Обработка команд для очередей (Q)
+    else if (isQueueCommand(cmd)) {
+        if (tokens.size() < 2) {
+            return "ERROR: Queue command requires container name";
+        }
+        
+        string queue_name = tokens[1];
+        
+        if (cmd == "QCREATE" || cmd == "qcreate") {
+            if (queues.find(queue_name) != queues.end()) {
+                return "ERROR: Queue already exists: " + queue_name;
+            }
+            queues[queue_name] = make_unique<Queue>();
+            return "SUCCESS: Queue created: " + queue_name;
+        }
+        else if (cmd == "QPUSH" || cmd == "qpush") {
+            if (tokens.size() < 3) {
+                return "ERROR: QPUSH requires value";
+            }
+            if (queues.find(queue_name) == queues.end()) {
+                return "ERROR: Queue not found: " + queue_name;
+            }
+            queues[queue_name]->push(tokens[2]);
+            return "SUCCESS: Value pushed to queue";
+        }
+        else if (cmd == "QPOP" || cmd == "qpop") {
+            if (queues.find(queue_name) == queues.end()) {
+                return "ERROR: Queue not found: " + queue_name;
+            }
+            try {
+                string value = queues[queue_name]->pop();
+                if (!value.empty()) {
+                    return "POPPED: " + value;
+                } else {
+                    return "ERROR: Queue is empty";
+                }
+            } catch (const runtime_error& e) {
+                return "ERROR: Queue is empty";
+            }
+        }
+        else if (cmd == "QPEEK" || cmd == "qpeek") {
+            if (queues.find(queue_name) == queues.end()) {
+                return "ERROR: Queue not found: " + queue_name;
+            }
+            try {
+                string value = queues[queue_name]->peek();
+                if (!value.empty()) {
+                    return "PEEK: " + value;
+                } else {
+                    return "ERROR: Queue is empty";
+                }
+            } catch (const runtime_error& e) {
+                return "ERROR: Queue is empty";
+            }
+        }
+        else if (cmd == "QSIZE" || cmd == "qsize") {
+            if (queues.find(queue_name) == queues.end()) {
+                return "ERROR: Queue not found: " + queue_name;
+            }
+            return "SIZE: " + to_string(queues[queue_name]->get_size());
+        }
+    }
+    
+    // Обработка команд для деревьев (T)
+    else if (isTreeCommand(cmd)) {
+        if (tokens.size() < 2) {
+            return "ERROR: Tree command requires container name";
+        }
+        
+        string tree_name = tokens[1];
+        
+        if (cmd == "TCREATE" || cmd == "tcreate") {
+            if (trees.find(tree_name) != trees.end()) {
+                return "ERROR: Tree already exists: " + tree_name;
+            }
+            trees[tree_name] = make_unique<FullBinaryTree>();
+            return "SUCCESS: Tree created: " + tree_name;
+        }
+        else if (cmd == "TINSERT" || cmd == "tinsert") {
+            if (tokens.size() < 4) {
+                return "ERROR: TINSERT requires key and value";
+            }
+            if (trees.find(tree_name) == trees.end()) {
+                return "ERROR: Tree not found: " + tree_name;
+            }
+            
+            try {
+                int key = stoi(tokens[2]);
+                if (trees[tree_name]->insert(key, tokens[3])) {
+                    return "SUCCESS: Value inserted with key " + tokens[2];
+                } else {
+                    return "ERROR: Failed to insert value (key might already exist)";
+                }
+            } catch (const exception& e) {
+                return "ERROR: Invalid key format";
+            }
+        }
+        else if (cmd == "TSEARCH" || cmd == "tsearch") {
+            if (tokens.size() < 3) {
+                return "ERROR: TSEARCH requires key";
+            }
+            if (trees.find(tree_name) == trees.end()) {
+                return "ERROR: Tree not found: " + tree_name;
+            }
+            
+            try {
+                int key = stoi(tokens[2]);
+                string value = trees[tree_name]->search(key);
+                if (!value.empty()) {
+                    return "FOUND: " + value;
+                } else {
+                    return "NOT_FOUND";
+                }
+            } catch (const exception& e) {
+                return "ERROR: Invalid key format";
+            }
+        }
+        else if (cmd == "TISFULL" || cmd == "tisfull") {
+            if (trees.find(tree_name) == trees.end()) {
+                return "ERROR: Tree not found: " + tree_name;
+            }
+            
+            bool is_full = trees[tree_name]->is_full();
+            return "IS_FULL: " + string(is_full ? "YES" : "NO");
+        }
+        else if (cmd == "THEIGHT" || cmd == "theight") {
+            if (trees.find(tree_name) == trees.end()) {
+                return "ERROR: Tree not found: " + tree_name;
+            }
+            
+            int height = trees[tree_name]->height();
+            return "HEIGHT: " + to_string(height);
+        }
+        else if (cmd == "TSIZE" || cmd == "tsize") {
+            if (trees.find(tree_name) == trees.end()) {
+                return "ERROR: Tree not found: " + tree_name;
+            }
+            
+            return "SIZE: " + to_string(trees[tree_name]->get_size());
+        }
+        else if (cmd == "TTRAVERSE" || cmd == "ttraverse") {
+            if (tokens.size() < 3) {
+                return "ERROR: TTRAVERSE requires type (INORDER/PREORDER/POSTORDER/LEVEL)";
+            }
+            if (trees.find(tree_name) == trees.end()) {
+                return "ERROR: Tree not found: " + tree_name;
+            }
+            
+            string traverse_type = tokens[2];
+            
+            if (traverse_type == "INORDER" || traverse_type == "inorder") {
+                trees[tree_name]->inorder();
+                return "SUCCESS";
+            }
+            else if (traverse_type == "PREORDER" || traverse_type == "preorder") {
+                trees[tree_name]->preorder();
+                return "SUCCESS";
+            }
+            else if (traverse_type == "POSTORDER" || traverse_type == "postorder") {
+                trees[tree_name]->postorder();
+                return "SUCCESS";
+            }
+            else if (traverse_type == "LEVEL" || traverse_type == "level") {
+                trees[tree_name]->level_order();
+                return "SUCCESS";
+            }
+            else {
+                return "ERROR: Invalid traverse type. Use INORDER/PREORDER/POSTORDER/LEVEL";
+            }
+        }
+    }
+    
+    // Обработка команд для двойных хэш-таблиц (H)
+    else if (isDoubleHashTableCommand(cmd)) {
+        if (tokens.size() < 2) {
+            return "ERROR: Double hash table command requires container name";
+        }
+        
+        string table_name = tokens[1];
+        
+        if (cmd == "HCREATE" || cmd == "hcreate") {
+            if (double_hash_tables.find(table_name) != double_hash_tables.end()) {
+                return "ERROR: Double hash table already exists: " + table_name;
+            }
+            double_hash_tables[table_name] = make_unique<DoubleHashTable>(10);
+            return "SUCCESS: Double hash table created: " + table_name;
+        }
+        else if (cmd == "HINSERT" || cmd == "hinsert") {
+            if (tokens.size() < 4) {
+                return "ERROR: HINSERT requires key and value";
+            }
+            if (double_hash_tables.find(table_name) == double_hash_tables.end()) {
+                return "ERROR: Double hash table not found: " + table_name;
+            }
+            if (double_hash_tables[table_name]->insert(tokens[2], tokens[3])) {
+                return "SUCCESS: Key-Value inserted";
+            } else {
+                return "ERROR: Failed to insert";
+            }
+        }
+        else if (cmd == "HSEARCH" || cmd == "hsearch") {
+            if (tokens.size() < 3) {
+                return "ERROR: HSEARCH requires key";
+            }
+            if (double_hash_tables.find(table_name) == double_hash_tables.end()) {
+                return "ERROR: Double hash table not found: " + table_name;
+            }
+            string value = double_hash_tables[table_name]->search(tokens[2]);
+            if (!value.empty()) {
+                return "FOUND: " + value;
+            } else {
+                return "NOT_FOUND";
+            }
+        }
+        else if (cmd == "HDELETE" || cmd == "hdelete") {
+            if (tokens.size() < 3) {
+                return "ERROR: HDELETE requires key";
+            }
+            if (double_hash_tables.find(table_name) == double_hash_tables.end()) {
+                return "ERROR: Double hash table not found: " + table_name;
+            }
+            if (double_hash_tables[table_name]->remove(tokens[2])) {
+                return "SUCCESS: Key deleted";
+            } else {
+                return "ERROR: Key not found";
+            }
+        }
+        else if (cmd == "HPRINT" || cmd == "hprint") {
+            if (double_hash_tables.find(table_name) == double_hash_tables.end()) {
+                return "ERROR: Double hash table not found: " + table_name;
+            }
+            double_hash_tables[table_name]->print();
+            return "SUCCESS";
+        }
+        else if (cmd == "HSIZE" || cmd == "hsize") {
+            if (double_hash_tables.find(table_name) == double_hash_tables.end()) {
+                return "ERROR: Double hash table not found: " + table_name;
+            }
+            return "SIZE: " + to_string(double_hash_tables[table_name]->get_size());
+        }
+    }
+    
+    // Команды управления базой данных
+    else if (cmd == "SAVE" || cmd == "save") {
+        if (tokens.size() < 2) {
+            return "ERROR: SAVE requires filename";
+        }
+        if (saveToFile(tokens[1])) {
+            return "SUCCESS: Database saved to " + tokens[1];
+        } else {
+            return "ERROR: Failed to save database";
+        }
+    }
+    else if (cmd == "LOAD" || cmd == "load") {
+        if (tokens.size() < 2) {
+            return "ERROR: LOAD requires filename";
+        }
+        if (loadFromFile(tokens[1])) {
+            return "SUCCESS: Database loaded from " + tokens[1];
+        } else {
+            return "ERROR: Failed to load database";
+        }
+    }
+    else if (cmd == "HELP" || cmd == "help") {
+        return Database::getHelpText();
+    }
+    else if (cmd == "CLEAR" || cmd == "clear") {
+        clear();
+        return "SUCCESS: Database cleared";
+    }
+    else if (cmd == "LIST" || cmd == "list") {
+        string result = "CONTAINERS:\n";
+        bool hasContainers = false;
+        
+        if (!arrays.empty()) {
+            result += "Arrays:\n";
+            for (const auto& pair : arrays) {
+                result += "  " + pair.first + "\n";
+            }
+            result += "\n";
+        }
+        
+        if (!singly_lists.empty()) {
+            result += "Singly Linked Lists: ";
+            for (const auto& pair : singly_lists) {
+                result += pair.first + " ";
+            }
+            result += "\n";
+        }
+        
+        if (!doubly_lists.empty()) {
+            result += "Doubly Linked Lists: ";
+            for (const auto& pair : doubly_lists) {
+                result += pair.first + " ";
+            }
+            result += "\n";
+        }
+        
+        if (!stacks.empty()) {
+            result += "Stacks: ";
+            for (const auto& pair : stacks) {
+                result += pair.first + " ";
+            }
+            result += "\n";
+        }
+        
+        if (!queues.empty()) {
+            result += "Queues: ";
+            for (const auto& pair : queues) {
+                result += pair.first + " ";
+            }
+            result += "\n";
+        }
+        
+        if (!trees.empty()) {
+            result += "Trees: ";
+            for (const auto& pair : trees) {
+                result += pair.first + " ";
+            }
+            result += "\n";
+        }
+        
+        if (!double_hash_tables.empty()) {
+            result += "Double Hash Tables: ";
+            for (const auto& pair : double_hash_tables) {
+                result += pair.first + " ";
+            }
+            result += "\n";
+        }
+        
+        if (!cuckoo_hash_tables.empty()) {
+            result += "Cuckoo Hash Tables: ";
+            for (const auto& pair : cuckoo_hash_tables) {
+                result += pair.first + " ";
+            }
+            result += "\n";
+        }
+        
+        if (result == "CONTAINERS:\n") {
+            result += "No containers found.";
+        }
+        
+        return result;
+    }
+    
+    // Обработка неизвестных команд
+    return "ERROR: Unknown command: " + cmd;
+}
+
+// ========== Статические методы ==========
+
+string Database::getHelpText() {
+    return "COMMANDS:\n"
+           "GENERAL:\n"
+           "  PRINT <container>         - Print any container\n"
+           "  LIST                      - List all containers\n"
+           "  SAVE <filename>           - Save database to file\n"
+           "  LOAD <filename>           - Load database from file\n"
+           "  CLEAR                     - Clear all containers\n"
+           "  HELP                      - Show this help\n\n"
+           
+           "ARRAYS (M):\n"
+           "  MCREATE <name>            - Create new array\n"
+           "  MPUSH <name> <value>      - Add value to array\n"
+           "  MINSERT <name> <idx> <val>- Insert value at index\n"
+           "  MGET <name> <idx>         - Get value at index\n"
+           "  MDEL <name> <idx>         - Delete value at index\n"
+           "  MREPLACE <name> <idx> <val>- Replace value at index\n"
+           "  MSIZE <name>              - Get array size\n\n"
+           
+           "SINGLY LINKED LISTS (F):\n"
+           "  FCREATE <name>            - Create new list\n"
+           "  FPUSH <name> FRONT <val>  - Add to front\n"
+           "  FPUSH <name> BACK <val>   - Add to back\n"
+           "  FPUSH <name> BEFORE <target> <val> - Insert before target\n"
+           "  FPUSH <name> AFTER <target> <val>  - Insert after target\n"
+           "  FDEL <name> FRONT         - Remove front\n"
+           "  FDEL <name> BACK          - Remove back\n"
+           "  FDEL <name> VALUE <val>   - Remove specific value\n"
+           "  FDEL <name> BEFORE <target> - Remove before target\n"
+           "  FDEL <name> AFTER <target>  - Remove after target\n"
+           "  FGET <name>               - Display entire list\n"
+           "  FGET <name> <value>       - Search for value\n"
+           "  FSIZE <name>              - Get list size\n"
+           "  FPRINT_BACKWARD <name>    - Print list backwards\n\n"
+           
+           "DOUBLY LINKED LISTS (L):\n"
+           "  LCREATE <name>            - Create new list\n"
+           "  LPUSH <name> FRONT <val>  - Add to front\n"
+           "  LPUSH <name> BACK <val>   - Add to back\n"
+           "  LPUSH <name> BEFORE <target> <val> - Insert before target\n"
+           "  LPUSH <name> AFTER <target> <val>  - Insert after target\n"
+           "  LDEL <name> FRONT         - Remove front\n"
+           "  LDEL <name> BACK          - Remove back\n"
+           "  LDEL <name> VALUE <val>   - Remove specific value\n"
+           "  LDEL <name> BEFORE <target> - Remove before target\n"
+           "  LDEL <name> AFTER <target>  - Remove after target\n"
+           "  LGET <name>               - Display entire list\n"
+           "  LGET <name> <value>       - Search for value\n"
+           "  LSIZE <name>              - Get list size\n"
+           "  LPRINT_BACKWARD <name>    - Print list backwards\n\n"
+           
+           "STACKS (S):\n"
+           "  SCREATE <name>            - Create new stack\n"
+           "  SPUSH <name> <value>      - Push value\n"
+           "  SPOP <name>               - Pop value\n"
+           "  SPEEK <name>              - Peek top value\n"
+           "  SSIZE <name>              - Get stack size\n\n"
+           
+           "QUEUES (Q):\n"
+           "  QCREATE <name>            - Create new queue\n"
+           "  QPUSH <name> <value>      - Enqueue value\n"
+           "  QPOP <name>               - Dequeue value\n"
+           "  QPEEK <name>              - Peek front value\n"
+           "  QSIZE <name>              - Get queue size\n\n"
+           
+           "FULL BINARY TREES (T):\n"
+           "  TCREATE <name>            - Create new tree\n"
+           "  TINSERT <name> <key> <val>- Insert key-value pair\n"
+           "  TSEARCH <name> <key>      - Search by key\n"
+           "  TISFULL <name>            - Check if tree is full\n"
+           "  THEIGHT <name>            - Get tree height\n"
+           "  TSIZE <name>              - Get tree size\n"
+           "  TTRAVERSE <name> INORDER  - Inorder traversal\n"
+           "  TTRAVERSE <name> PREORDER - Preorder traversal\n"
+           "  TTRAVERSE <name> POSTORDER- Postorder traversal\n"
+           "  TTRAVERSE <name> LEVEL    - Level-order traversal\n\n"
+           
+           "DOUBLE HASH TABLES (H):\n"
+           "  HCREATE <name>            - Create new double hash table\n"
+           "  HINSERT <name> <key> <val>- Insert key-value pair\n"
+           "  HSEARCH <name> <key>      - Search by key\n"
+           "  HDELETE <name> <key>      - Delete by key\n"
+           "  HPRINT <name>             - Print hash table\n"
+           "  HSIZE <name>              - Get hash table size\n\n"
+}

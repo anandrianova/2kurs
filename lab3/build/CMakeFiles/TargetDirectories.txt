@@ -1,0 +1,15 @@
+/home/an_andrianova/program2/2kurs/lab3/build/CMakeFiles/main.dir
+/home/an_andrianova/program2/2kurs/lab3/build/CMakeFiles/google_tests.dir
+/home/an_andrianova/program2/2kurs/lab3/build/CMakeFiles/catch2_tests.dir
+/home/an_andrianova/program2/2kurs/lab3/build/CMakeFiles/boost_tests.dir
+/home/an_andrianova/program2/2kurs/lab3/build/CMakeFiles/benchmark_exec.dir
+/home/an_andrianova/program2/2kurs/lab3/build/CMakeFiles/cppcheck_all.dir
+/home/an_andrianova/program2/2kurs/lab3/build/CMakeFiles/install_deps.dir
+/home/an_andrianova/program2/2kurs/lab3/build/CMakeFiles/run_all_tests.dir
+/home/an_andrianova/program2/2kurs/lab3/build/CMakeFiles/run_benchmarks.dir
+/home/an_andrianova/program2/2kurs/lab3/build/CMakeFiles/full_check.dir
+/home/an_andrianova/program2/2kurs/lab3/build/CMakeFiles/coverage_report.dir
+/home/an_andrianova/program2/2kurs/lab3/build/CMakeFiles/show_help.dir
+/home/an_andrianova/program2/2kurs/lab3/build/CMakeFiles/default.dir
+/home/an_andrianova/program2/2kurs/lab3/build/CMakeFiles/edit_cache.dir
+/home/an_andrianova/program2/2kurs/lab3/build/CMakeFiles/rebuild_cache.dir

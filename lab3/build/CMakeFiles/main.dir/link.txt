@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/main.dir/main.cpp.o CMakeFiles/main.dir/Array.cpp.o CMakeFiles/main.dir/SingleList.cpp.o CMakeFiles/main.dir/DoubleList.cpp.o CMakeFiles/main.dir/Stack.cpp.o CMakeFiles/main.dir/Queue.cpp.o CMakeFiles/main.dir/FullBinaryTree.cpp.o CMakeFiles/main.dir/HashTable.cpp.o CMakeFiles/main.dir/DB.cpp.o -o main 

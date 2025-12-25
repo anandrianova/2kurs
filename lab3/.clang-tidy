@@ -1,0 +1,28 @@
+---
+Checks: >
+    *,
+    -abseil-*,
+    -altera-*,
+    -android-*,
+    -fuchsia-*,
+    -google-*,
+    -hicpp-*,
+    -llvm-*,
+    -llvmlibc-*,
+    -modernize-*,
+    -mpi-*,
+    -objc-*,
+    -openmp-*,
+    -zircon-*,
+    -readability-*,
+    -cppcoreguidelines-*
+WarningsAsErrors: '*'
+CheckOptions:
+  - key:             readability-identifier-naming.ClassCase
+    value:           CamelCase
+  - key:             readability-identifier-naming.StructCase
+    value:           CamelCase
+  - key:             readability-identifier-naming.FunctionCase
+    value:           camelBack
+  - key:             readability-identifier-naming.VariableCase
+    value:           lower_case
